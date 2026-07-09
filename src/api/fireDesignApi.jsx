@@ -1,14 +1,42 @@
-import { API_TIMEOUT_MS, API_URL } from '../constants/fireDesignOptions';
-import { getErrorMessage } from '../utils/formatters';
+export const API_BASE_URL = 'https://backend-x6uw.onrender.com';
 
-const RENDER_BACKEND_URL = 'https://backend-x6uw.onrender.com';
+const ANALYSIS_TIMEOUT_MS = 180000;
 
-export const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || 'https://backend-x6uw.onrender.com'
-).replace(/\/$/, '');
+function parseBackendError(error) {
+  if (!error) return 'Analysis failed.';
+
+  if (typeof error === 'string') return error;
+
+  if (Array.isArray(error)) {
+    return error
+      .map((item) => item?.msg || item?.message || item?.reason || JSON.stringify(item))
+      .join(' | ');
+  }
+
+  if (typeof error === 'object') {
+    if (error.message && error.reason) {
+      const recommendedFix = Array.isArray(error.recommended_fix)
+        ? `\n\nRecommended fix:\n${error.recommended_fix.map((item) => `• ${item}`).join('\n')}`
+        : '';
+
+      return `${error.message}: ${error.reason}${recommendedFix}`;
+    }
+
+    if (error.detail) return parseBackendError(error.detail);
+    if (error.message) return error.message;
+    if (error.reason) return error.reason;
+    if (error.error) return parseBackendError(error.error);
+
+    return JSON.stringify(error, null, 2);
+  }
+
+  return String(error);
+}
 
 export async function checkBackendStatus() {
-  const response = await fetch(`${API_URL}/api/status`);
+  const response = await fetch(`${API_BASE_URL}/api/status`, {
+    method: 'GET',
+  });
 
   const data = await response.json().catch(() => ({}));
 
@@ -24,23 +52,23 @@ export async function analyzeFireDesign({ file, settings, signal }) {
     throw new Error('Please upload a floor plan first.');
   }
 
-  const body = new FormData();
-  body.append('file', file);
+  const formData = new FormData();
+  formData.append('file', file);
 
   Object.entries(settings).forEach(([key, value]) => {
-    body.append(key, String(value));
+    formData.append(key, String(value));
   });
 
-  const response = await fetch(`${API_URL}/api/analyze`, {
+  const response = await fetch(`${API_BASE_URL}/api/analyze`, {
     method: 'POST',
-    body,
+    body: formData,
     signal,
   });
 
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(data.detail || data));
+    throw new Error(parseBackendError(data.detail || data));
   }
 
   return data;
@@ -49,23 +77,22 @@ export async function analyzeFireDesign({ file, settings, signal }) {
 export function createAnalysisController() {
   const controller = new AbortController();
 
-  const timeoutId = window.setTimeout(() => {
+  const timeout = window.setTimeout(() => {
     controller.abort();
-  }, API_TIMEOUT_MS);
+  }, ANALYSIS_TIMEOUT_MS);
 
   return {
     controller,
     signal: controller.signal,
     cancel: () => controller.abort(),
-    clear: () => window.clearTimeout(timeoutId),
+    clear: () => window.clearTimeout(timeout),
   };
 }
 
 export function buildBackendMessage(data) {
-  const service = data?.service || 'Backend';
-  const files = Array.isArray(data?.accepted_files)
-    ? data.accepted_files.join(', ').toUpperCase()
-    : 'FILES OK';
-
-  return `${service} · ${files}`;
+  return `${data?.service || 'Backend'} · ${
+    Array.isArray(data?.accepted_files)
+      ? data.accepted_files.join(', ').toUpperCase()
+      : 'FILES OK'
+  }`;
 }
