@@ -1,6 +1,12 @@
 import { API_TIMEOUT_MS, API_URL } from '../constants/fireDesignOptions';
 import { getErrorMessage } from '../utils/formatters';
 
+const RENDER_BACKEND_URL = 'https://backend-x6uw.onrender.com';
+
+export const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || RENDER_BACKEND_URL
+).replace(/\/$/, '');
+
 export async function checkBackendStatus() {
   const response = await fetch(`${API_URL}/api/status`);
 

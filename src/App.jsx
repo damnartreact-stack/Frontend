@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  API_BASE_URL,
   analyzeFireDesign,
   buildBackendMessage,
   checkBackendStatus,
@@ -199,7 +200,7 @@ function App() {
     } catch (err) {
       setApiState({
         status: 'offline',
-        message: 'Backend offline at http://127.0.0.1:8020. Start FastAPI and try again.',
+        message: `Backend offline at ${API_BASE_URL}. Check Render backend and try again.`,
         meta: null,
       });
     }
